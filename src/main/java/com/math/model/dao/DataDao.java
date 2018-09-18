@@ -1,21 +1,28 @@
 package com.math.model.dao;
 
+import com.math.model.domain.Data;
 import com.math.model.domain.Economics;
 import com.math.model.domain.Filtered;
 import com.math.model.domain.TerroristAttack;
+import com.math.model.repository.DataRepository;
 import com.math.model.repository.EconomicsRepository;
 import com.math.model.repository.FilteredRepository;
 import com.math.model.repository.TerroristAttacksRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import javax.persistence.criteria.CriteriaBuilder;
 import javax.swing.*;
 import java.io.*;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author yangkuan
@@ -31,6 +38,11 @@ public class DataDao {
 
     @Autowired
     FilteredRepository filteredRepository;
+
+    @Autowired
+    DataRepository dataRepository;
+
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
 
 
     public List<TerroristAttack> convertData(){
@@ -255,10 +267,254 @@ public class DataDao {
 
     }
 
+    /**
+     * 按照凶手进行匹配
+     */
+    public void ReadFiltered1(){
+        List<Data> datas = dataRepository.findAll();
+
+        Data maxData = new Data(2017,12,31,1004,12,5
+                ,true,true,true,true,true
+                ,true,true,true,9,22,1004
+                ,"",13,1570,1360,500,8191
+                ,151,200,true,4);
+
+        Data minData = new Data(1998,1,1,4,1,1
+                ,false,false,false,false,false
+                ,false,false,false,1,1,4
+                ,"",1,0,0,0,0
+                ,0,0,false,0);
+
+        List<List<Integer>> result = new ArrayList<>();
+        Map<String,List<Data>> dataMap = new HashMap<>(1473);
+        for(int i=0;i<datas.size();i++){
+            String key = datas.get(i).getGname();
+            if(dataMap.containsKey(key)){
+                List<Data> value = dataMap.get(key);
+                value.add(datas.get(i));
+                dataMap.put(key, value);
+            }
+            else {
+                List<Data> value = new ArrayList<>();
+                value.add(datas.get(i));
+                dataMap.put(key,value);
+            }
+        }
+        for(String key:dataMap.keySet()){
+            List<Data> value = dataMap.get(key);
+            if(value.size()==1){
+                continue;
+            }
+            for(int i=0;i<value.size();i++){
+                for(int j=i+1;j<value.size();j++){
+                    List<Integer> rel = generateVector(datas.get(i),minData,maxData);
+                    rel.addAll(generateVector(datas.get(j),minData,maxData));
+                    result.add(rel);
+                }
+            }
+        }
+        try {
+            String savePath = "matchingPairMatrix.txt";
+            writeTxt2(result,savePath);
+        }
+        catch (IOException e){
+            System.out.println(e);
+        }
+
+    }
+
+    public void ReadFiltered2(){
+        List<Data> datas = dataRepository.findAll();
+
+        Data maxData = new Data(2017,12,31,1004,12,5
+                ,true,true,true,true,true
+                ,true,true,true,9,22,1004
+                ,"",13,1570,1360,500,8191
+                ,151,200,true,4);
+
+        Data minData = new Data(1998,1,1,4,1,1
+                ,false,false,false,false,false
+                ,false,false,false,1,1,4
+                ,"",1,0,0,0,0
+                ,0,0,false,0);
+
+        List<List<Integer>> result = new ArrayList<>();
+        for(Data data:datas){
+            result.add(generateVector(data,minData,maxData));
+        }
+        try {
+            String savePath = "";
+            writeTxt2(result,savePath);
+        }
+        catch (IOException e){
+            System.out.println(e);
+        }
+
+    }
+
+    /**
+     *
+     * @param data
+     * @param minData
+     * @param maxData
+     * @return
+     */
+    private List<Integer> generateVector(Data data,Data minData,Data maxData){
+        List<Integer> rel = new ArrayList<>();
+        //9个1/0
+        rel.add(isTrue(data.getVicinity()));
+        rel.add(isTrue(data.getCrit1()));
+        rel.add(isTrue(data.getCrit2()));
+        rel.add(isTrue(data.getCrit3()));
+        rel.add(isTrue(data.getDoubtterr()));
+        rel.add(isTrue(data.getMultiple()));
+        rel.add(isTrue(data.getSuccess()));
+        rel.add(isTrue(data.getSuicide()));
+        rel.add(isTrue(data.getProperty()));
+        //iyear imonth iday country region natlty
+        rel.addAll(norm3(data.getIyear(),minData.getIyear(),maxData.getIyear(),1));
+        rel.addAll(norm3(data.getImonth(),minData.getImonth(),maxData.getImonth(),1));
+        rel.addAll(norm3(data.getIday(),minData.getIday(),maxData.getIday(),1));
+        rel.addAll(norm3(data.getCountry(),minData.getCountry(),maxData.getCountry(),1));
+        rel.addAll(norm3(data.getRegion(),minData.getRegion(),maxData.getRegion(),1));
+        rel.addAll(norm3(data.getNatlty(),minData.getNatlty(),maxData.getNatlty(),1));
+        //nkill nkillus nkillter nwound nwoundus nwoundte
+        rel.addAll(nkillNorm(data.getNkill(),4));
+        rel.addAll(norm3(data.getNkillus(),minData.getNkillus(),maxData.getNkillus(),2));
+        rel.addAll(norm3(data.getNkillter(),minData.getNkillter(),maxData.getNkillter(),2));
+        rel.addAll(nwoundNorm(data.getNwound(),4));
+        rel.addAll(norm3(data.getNwoundus(),minData.getNwoundus(),maxData.getNwoundus(),2));
+        rel.addAll(norm3(data.getNwoundte(),minData.getNwoundte(),maxData.getNwoundte(),2));
+        // specificity attackType targetType propextent
+        rel.addAll(norm2(data.getSpecificity(),minData.getSpecificity(),maxData.getSpecificity(),1));
+        rel.addAll(norm2(data.getAttackType(),minData.getAttackType(),maxData.getAttackType(),1));
+        rel.addAll(norm2(data.getTargetType(),minData.getTargetType(),maxData.getTargetType(),1));
+        rel.addAll(norm2(data.getWeaponType(),minData.getWeaponType(),maxData.getWeaponType(),1));
+        rel.addAll(norm2(data.getPropextent(),minData.getPropextent(),maxData.getPropextent(),1));
+        return rel;
+    }
+
+
+    public void ReadFiltered3(){
+        List<Filtered> filtereds = filteredRepository.findAll();
+        Filtered maxFiltereds = new Filtered(2017,12,31,true,240,12,5
+                ,true,true,true,true,true,true,9,22
+                ,true,13,1570,4,true);
+        Filtered minFiltereds = new Filtered(1998,1,1,false,1,1
+                ,1,false,false,false,false,false,false
+                ,1,1,false,1,0,1,false);
+
+        List<List<Integer>> result = new ArrayList<>();
+        for(Filtered filtered:filtereds){
+            List<Integer> rel = new ArrayList<>();
+            rel.add(isTrue(filtered.getExtended()));
+            rel.addAll(norm2(filtered.getRegion(),minFiltereds.getRegion(),maxFiltereds.getRegion(),1));
+            rel.addAll(norm2(filtered.getSpecificity(),minFiltereds.getSpecificity(),maxFiltereds.getSpecificity(),1));
+            rel.add(isTrue(filtered.getVicinity()));
+            rel.add(isTrue(filtered.getCrit1()));
+            rel.add(isTrue(filtered.getCrit2()));
+            rel.add(isTrue(filtered.getCrit3()));
+            rel.add(isTrue(filtered.getSuccess()));
+            rel.add(isTrue(filtered.getSuicide()));
+            rel.add(filtered.getAttackType());
+            rel.add(filtered.getTargetType());
+            rel.add(isTrue(filtered.getClaimed()));
+            rel.addAll(norm2(filtered.getWeaponType(),minFiltereds.getWeaponType(),maxFiltereds.getWeaponType(),1));
+            List<Integer> nKills = norm2(filtered.getNkill(),minFiltereds.getNkill(),maxFiltereds.getNkill(),5);
+            rel.addAll(nKills);
+
+            List<Integer> propextents = norm2(filtered.getNkill(),minFiltereds.getNkill(),maxFiltereds.getNkill(),5);
+            rel.addAll(propextents);
+
+            rel.add((isTrue(filtered.getIshostkid())));
+            result.add(rel);
+        }
+        try {
+            String savePath = "E:/allMatrix.txt";
+            writeTxt2(result,savePath);
+        }
+        catch (IOException e){
+            System.out.println(e);
+        }
+
+    }
+
+    private List<Integer> nkillNorm(int val, int weight){
+        List<Integer> re =new ArrayList<>();
+        for(int i=0;i<4;i++){
+            re.add(0);
+        }
+        if(val<3){
+            re.set(0,weight);
+        }
+        else if(val<10){
+            re.set(1,weight);
+        }
+        else if(val<30){
+            re.set(2,weight);
+        }
+        else {
+            re.set(3,weight);
+        }
+        return re;
+    }
+
+    private List<Integer> nwoundNorm(int val, int weight){
+        List<Integer> re =new ArrayList<>();
+        for(int i=0;i<4;i++){
+            re.add(0);
+        }
+        if(val<10){
+            re.set(0,weight);
+        }
+        else if(val<50){
+            re.set(1,weight);
+        }
+        else if(val<100){
+            re.set(2,weight);
+        }
+        else {
+            re.set(3,weight);
+        }
+        return re;
+    }
+
     private double norm(int val, int min, int max){
         double margin = max-min;
         return (val-min)/margin;
     }
+
+    private List<Integer> norm2(int val, int min, int max, int weight){
+        double len = max-min+1;
+        List<Integer> re =new ArrayList<>();
+        for(int i=0;i<len;i++){
+            re.add(0);
+        }
+//        logger.error("margin:"+margin);
+//        logger.error("(val-min):"+(val-min));
+//        logger.error("(val-min)/margin:"+((val-min)/margin));
+//        logger.error("(int)((val-min)/margin):"+(int)((val-min)/margin));
+        re.set(val-min,weight);
+        return re;
+    }
+
+
+    private List<Integer> norm3(int val, int min, int max, int weight){
+        double margin = (max-min)/4.0;
+        List<Integer> re =new ArrayList<>();
+        for(int i=0;i<5;i++){
+            re.add(0);
+        }
+//        logger.error("margin:"+margin);
+//        logger.error("(val-min):"+(val-min));
+//        logger.error("(val-min)/margin:"+((val-min)/margin));
+//        logger.error("(int)((val-min)/margin):"+(int)((val-min)/margin));
+        re.set((int)((val-min)/margin),weight);
+        return re;
+    }
+
+
+
 
     private Integer isTrue(Boolean b){
         if(b!=null&&b){
@@ -272,6 +528,17 @@ public class DataDao {
         BufferedWriter out = new BufferedWriter(new FileWriter(fileName));
         for(double[] row:matrix){
             for(double d:row){
+                out.write(d+" ");
+            }
+            out.newLine();
+        }
+        out.close();
+    }
+
+    private void writeTxt2(List<List<Integer>> matrix, String savePath) throws IOException {
+        BufferedWriter out = new BufferedWriter(new FileWriter(savePath));
+        for(List<Integer> row:matrix){
+            for(Integer d:row){
                 out.write(d+" ");
             }
             out.newLine();

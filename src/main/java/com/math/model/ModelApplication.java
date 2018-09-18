@@ -3,6 +3,8 @@ package com.math.model;
 import com.math.model.dao.DataDao;
 import com.math.model.domain.TerroristAttack;
 import com.math.model.repository.TerroristAttacksRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -21,6 +23,8 @@ import java.util.List;
 public class ModelApplication implements CommandLineRunner{
 
 
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
+
 	@Autowired
 	DataDao dataDao;
 
@@ -32,7 +36,7 @@ public class ModelApplication implements CommandLineRunner{
 		/*List<TerroristAttack> terroristAttacks = dataDao.convertData();
 		terroristAttacksRepository.saveAll(terroristAttacks);*/
 
-		dataDao.ReadFiltered();
+		dataDao.ReadFiltered2();
 
 	}
 
