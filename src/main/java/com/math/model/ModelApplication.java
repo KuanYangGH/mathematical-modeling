@@ -36,7 +36,7 @@ public class ModelApplication implements CommandLineRunner{
 		/*List<TerroristAttack> terroristAttacks = dataDao.convertData();
 		terroristAttacksRepository.saveAll(terroristAttacks);*/
 
-		dataDao.ReadFiltered2();
+		dataDao.ReadFiltered1();
 
 	}
 

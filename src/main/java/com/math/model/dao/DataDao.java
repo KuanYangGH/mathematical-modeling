@@ -286,6 +286,7 @@ public class DataDao {
                 ,0,0,false,0);
 
         List<List<Integer>> result = new ArrayList<>();
+        List<String> ngnames = new ArrayList<>();
         Map<String,List<Data>> dataMap = new HashMap<>(1473);
         for(int i=0;i<datas.size();i++){
             String key = datas.get(i).getGname();
@@ -298,24 +299,60 @@ public class DataDao {
                 List<Data> value = new ArrayList<>();
                 value.add(datas.get(i));
                 dataMap.put(key,value);
+                ngnames.add(key);
             }
         }
+        logger.error("dataMap.keySet().size():"+dataMap.keySet().size());
+        List<String> strings = new ArrayList<>();
         for(String key:dataMap.keySet()){
             List<Data> value = dataMap.get(key);
-            if(value.size()==1){
+            int len = value.size();
+            logger.error("key:"+key+";value.size():"+len);
+            strings.add(key+";"+len);
+            if(len<=1){
                 continue;
             }
-            for(int i=0;i<value.size();i++){
-                for(int j=i+1;j<value.size();j++){
-                    List<Integer> rel = generateVector(datas.get(i),minData,maxData);
-                    rel.addAll(generateVector(datas.get(j),minData,maxData));
-                    result.add(rel);
+            if(len<50){
+                for(int i=0;i<len;i++){
+                    for(int j=i+1;j<len;j++){
+                        List<Integer> rel = generateVector(datas.get(i),minData,maxData);
+                        rel.addAll(generateVector(datas.get(j),minData,maxData));
+                        result.add(rel);
+                    }
                 }
             }
+            else {
+                int margin = len/50;
+                for(int i=0;i<len;i+=margin){
+                    for(int j=i+margin;j<len;j+=margin){
+                        List<Integer> rel = generateVector(datas.get(i),minData,maxData);
+                        rel.addAll(generateVector(datas.get(j),minData,maxData));
+                        result.add(rel);
+                    }
+                }
+            }
+
         }
+        //不匹配对生成
+        List<List<Integer>> nonmatchingResult = new ArrayList<>();
+        for(int i=0;i<ngnames.size();i++){
+            for(int j=i+1;j<ngnames.size();j++){
+                List<Data> value1 = dataMap.get(ngnames.get(i));
+                List<Data> value2 = dataMap.get(ngnames.get(j));
+                List<Integer> rel = generateVector(value1.get(0),minData,maxData);
+                rel.addAll(generateVector(value2.get(0),minData,maxData));
+                nonmatchingResult.add(rel);
+            }
+        }
+
+
         try {
-            String savePath = "matchingPairMatrix.txt";
+            //String savePath = "E:/gnameStatistics.txt";
+            String savePath = "E:/matchingPairMatrix.txt";
             writeTxt2(result,savePath);
+            String saveNonMatchingPath = "E:/nonMatchingPairMatrix.txt";
+            writeTxt2(nonmatchingResult,saveNonMatchingPath);
+            //writeStrings2Txt(strings,savePath);
         }
         catch (IOException e){
             System.out.println(e);
@@ -541,6 +578,15 @@ public class DataDao {
             for(Integer d:row){
                 out.write(d+" ");
             }
+            out.newLine();
+        }
+        out.close();
+    }
+
+    private void writeStrings2Txt(List<String> strings,String savePath) throws IOException {
+        BufferedWriter out = new BufferedWriter(new FileWriter(savePath));
+        for(String s:strings){
+            out.write(s);
             out.newLine();
         }
         out.close();
